@@ -39,7 +39,11 @@ func main() {
 		}
 	}
 
-	fmt.Println(competition.GetFinalReport())
+	// Print event log
+	fmt.Print("Output log\n")
+	fmt.Println(competition.GetEventLog())
+	fmt.Print("\nResulting table\n")
+	fmt.Print(competition.GetFinalReport())
 }
 
 func loadConfig(path string) (*domain.Config, error) {
