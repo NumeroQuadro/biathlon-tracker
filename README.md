@@ -1,112 +1,152 @@
-# System prototype for biathlon competitions
-The prototype must be able to work with a configuration file and a set of external events of a certain format.
-Solution should contain golang (1.20 or newer) source file/files and unit tests (optional)
+# Biathlon Competition Tracker
 
-## Configuration (json)
+A Go application for tracking biathlon competitions, processing events, and generating reports.
 
-- **Laps**        - Amount of laps for main distance
-- **LapLen**      - Length of each main lap
-- **PenaltyLen**  - Length of each penalty lap
-- **FiringLines** - Number of firing lines per lap
-- **Start**       - Planned start time for the first competitor
-- **StartDelta**  - Planned interval between starts
+## Prerequisites
 
-## Events
-All events are characterized by time and event identifier. Outgoing events are events created during program operation. Events related to the "incoming" category cannot be generated and are output in the same form as they were submitted in the input file.
+- Go 1.21 or later
+- Git
 
-- All events occur sequentially in time. (***Time of event N+1***) >= (***Time of event N***)
-- Time format ***[HH:MM:SS.sss]***. Trailing zeros are required in input and output
-
-#### Common format for events:
-[***time***] **eventID** **competitorID** extraParams
+## Project Structure
 
 ```
-Incoming events
-EventID | extraParams | Comments
-1       |             | The competitor registered
-2       | startTime   | The start time was set by a draw
-3       |             | The competitor is on the start line
-4       |             | The competitor has started
-5       | firingRange | The competitor is on the firing range
-6       | target      | The target has been hit
-7       |             | The competitor left the firing range
-8       |             | The competitor entered the penalty laps
-9       |             | The competitor left the penalty laps
-10      |             | The competitor ended the main lap
-11      | comment     | The competitor can`t continue
-```
-An competitor is disqualified if he/she does not start during his/her start interval. This marked as **NotStarted** in final report.
-If the competitor can`t continue it should be marked in final report as **NotFinished**
-
-```
-Outgoing events
-EventID | extraParams | Comments
-32      |             | The competitor is disqualified
-33      |             | The competitor has finished
+biathlon-tracker/
+├── cmd/
+│   └── biathlon-tracker/    # Main application entry point
+├── internal/
+│   ├── domain/             # Domain models and business logic
+│   └── service/            # Business logic implementation
+├── config/                 # Configuration files
+└── sunny_5_skiers/        # Example competition data
 ```
 
-## Final report
-The final report should contain the list of all registered competitors
-sorted by ascending time.
-- Total time includes the difference between scheduled and actual start time or **NotStarted**/**NotFinished** marks
-- Time taken to complete each lap
-- Average speed for each lap [m/s]
-- Time taken to complete penalty laps
-- Average speed over penalty laps [m/s]
-- Number of hits/number of shots
+## Building the Application
 
-Examples:
+To build the application, run:
 
-`Config.conf`
+```bash
+go build -o biathlon-tracker cmd/biathlon-tracker/main.go
+```
+
+## Running the Application
+
+The application requires two command-line arguments:
+1. Path to the configuration file (JSON)
+2. Path to the events file
+
+Example:
+```bash
+./biathlon-tracker config/config.json config/events
+```
+
+Or using `go run`:
+```bash
+go run cmd/biathlon-tracker/main.go config/config.json config/events
+```
+
+## Configuration File Format
+
+The configuration file (`config.json`) should contain the following parameters:
+
 ```json
 {
-    "laps" : 2,
-    "lapLen": 3651,
-    "penaltyLen": 50,
-    "firingLines": 1,
-    "start": "09:30:00",
-    "startDelta": "00:00:30"
+    "laps": 2,              // Number of laps in the race
+    "lapLen": 3500,         // Length of each lap in meters
+    "penaltyLen": 150,      // Length of penalty loop in meters
+    "firingLines": 2,       // Number of firing lines
+    "start": "10:00:00.000", // Race start time
+    "startDelta": "00:01:30.000" // Time interval between competitors
 }
 ```
 
-`IncomingEvents`
+## Events File Format
 
+The events file contains one event per line in the following format:
 ```
-[09:05:59.867] 1 1
-[09:15:00.841] 2 1 09:30:00.000
-[09:29:45.734] 3 1
-[09:30:01.005] 4 1
-[09:49:31.659] 5 1 1
-[09:49:33.123] 6 1 1
-[09:49:34.650] 6 1 2
-[09:49:35.937] 6 1 4
-[09:49:37.364] 6 1 5
-[09:49:38.339] 7 1
-[09:49:55.915] 8 1
-[09:51:48.391] 9 1
-[09:59:03.872] 10 1
-[09:59:03.872] 11 1 Lost in the forest
-
+[HH:MM:SS.sss] EVENT_TYPE COMPETITOR_ID [ADDITIONAL_DATA]
 ```
 
-`Output log`
+Example:
 ```
-[09:05:59.867] The competitor(1) registered
-[09:15:00.841] The start time for the competitor(1) was set by a draw to 09:30:00.000
-[09:29:45.734] The competitor(1) is on the start line
-[09:30:01.005] The competitor(1) has started
-[09:49:31.659] The competitor(1) is on the firing range(1)
-[09:49:33.123] The target(1) has been hit by competitor(1)
-[09:49:34.650] The target(2) has been hit by competitor(1)
-[09:49:35.937] The target(4) has been hit by competitor(1)
-[09:49:37.364] The target(5) has been hit by competitor(1)
-[09:49:38.339] The competitor(1) left the firing range
-[09:49:55.915] The competitor(1) entered the penalty laps
-[09:51:48.391] The competitor(1) left the penalty laps
-[09:59:03.872] The competitor(1) ended the main lap
-[09:59:05.321] The competitor(1) can`t continue: Lost in the forest
+[10:00:00.000] REGISTERED 1
+[10:00:00.000] START_TIME_SET 1 10:00:00.000
+[10:00:01.000] STARTED 1
+[10:10:00.000] ENDED_MAIN_LAP 1
+[10:20:00.000] ENDED_MAIN_LAP 1
 ```
 
-`Resulting table`
+## Running Tests
+
+To run all tests:
+```bash
+go test ./...
 ```
-[NotFinished] 1 [{00:29:03.872, 2.093}, {,}] {00:01:44.296, 0.481} 4/5
+
+To run tests with coverage:
+```bash
+go test ./... -cover
+```
+
+To run tests in a specific package:
+```bash
+go test ./internal/domain/...
+go test ./internal/service/...
+```
+
+## Test Coverage
+
+The project includes comprehensive test coverage for:
+- Domain models (Competitor, Config)
+- Service layer (CompetitionService)
+- Event processing
+- Time calculations
+- Status tracking
+
+## Output Format
+
+The application generates a report with the following information for each competitor:
+- ID
+- Status (NotStarted, NotFinished, Disqualified, Finished)
+- Total time
+- Total penalty time
+- Number of hits
+- Number of shots
+- Average speed
+
+Example output:
+```
+1. NotStarted 00:00:00.000 00:00:00.000 0 0 0.00
+2. NotStarted 00:00:00.000 00:00:00.000 0 0 0.00
+3. NotStarted 00:00:00.000 00:00:00.000 0 0 0.00
+4. NotStarted 00:00:00.000 00:00:00.000 0 0 0.00
+5. NotStarted 00:00:00.000 00:00:00.000 0 0 0.00
+```
+
+## Event Types
+
+The application supports the following event types:
+- REGISTERED
+- START_TIME_SET
+- STARTED
+- ENDED_MAIN_LAP
+- ENDED_PENALTY_LAP
+- TARGET_HIT
+- TARGET_MISSED
+- DISQUALIFIED
+
+## Error Handling
+
+The application handles various error conditions:
+- Invalid configuration
+- Invalid event format
+- Invalid timestamps
+- Invalid competitor IDs
+- Invalid event types
+
+## Contributing
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
